@@ -69,3 +69,8 @@ Thumbs.db
 
 # MongoDB local data (if using local MongoDB)
 data/
+
+# Project planning files
+1.txt
+TODO.md
+mongodb.msi

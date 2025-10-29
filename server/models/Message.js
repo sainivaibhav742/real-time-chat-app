@@ -19,14 +19,8 @@ const messageSchema = new mongoose.Schema({
     default: Date.now,
   },
   readBy: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    },
-    readAt: {
-      type: Date,
-      default: Date.now,
-    },
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   }],
 });
 

@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const messageRoutes = require('./routes/messages');
+const aiRoutes = require('./routes/ai');
 const Message = require('./models/Message');
 
 const app = express();
@@ -25,6 +26,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatapp', {
@@ -45,25 +47,60 @@ io.on('connection', (socket) => {
 
   socket.on('send-message', async (data) => {
     try {
-      // Save message to database
-      const message = new Message({
-        roomId: data.roomId,
-        sender: data.senderId,
-        content: data.content,
-      });
-      await message.save();
+      // Check if message is for AI
+      if (data.content.toLowerCase().includes('@ai') || data.content.toLowerCase().includes('ai bot')) {
+        // Handle AI message
+        const axios = require('axios');
+        const token = data.token; // Assume token is sent with message
 
-      // Populate sender info
-      await message.populate('sender', 'username');
+        try {
+          const aiResponse = await axios.post('http://localhost:5000/api/ai/chat', {
+            message: data.content.replace(/@ai|@ai bot/gi, '').trim(),
+            roomId: data.roomId
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
 
-      // Emit to room
-      io.to(data.roomId).emit('receive-message', {
-        _id: message._id,
-        roomId: message.roomId,
-        sender: message.sender,
-        content: message.content,
-        timestamp: message.timestamp,
-      });
+          // Save AI message to database
+          const aiMessage = new Message({
+            roomId: data.roomId,
+            sender: null, // AI doesn't have a user ID
+            content: aiResponse.data.message,
+          });
+          await aiMessage.save();
+
+          // Emit AI message to room
+          io.to(data.roomId).emit('receive-message', {
+            _id: aiMessage._id,
+            roomId: aiMessage.roomId,
+            sender: { username: 'AI Assistant' },
+            content: aiMessage.content,
+            timestamp: aiMessage.timestamp,
+          });
+        } catch (aiError) {
+          console.error('AI response error:', aiError);
+        }
+      } else {
+        // Save regular message to database
+        const message = new Message({
+          roomId: data.roomId,
+          sender: data.senderId,
+          content: data.content,
+        });
+        await message.save();
+
+        // Populate sender info
+        await message.populate('sender', 'username');
+
+        // Emit to room
+        io.to(data.roomId).emit('receive-message', {
+          _id: message._id,
+          roomId: message.roomId,
+          sender: message.sender,
+          content: message.content,
+          timestamp: message.timestamp,
+        });
+      }
     } catch (error) {
       console.error('Error saving message:', error);
     }
@@ -74,6 +111,19 @@ io.on('connection', (socket) => {
       user: data.user,
       isTyping: data.isTyping,
     });
+  });
+
+  socket.on('mark-read', async (data) => {
+    try {
+      const { messageId, userId, roomId } = data;
+      await Message.findByIdAndUpdate(messageId, {
+        $addToSet: { readBy: userId }
+      });
+      // Emit read receipt to room
+      socket.to(roomId).emit('message-read', { messageId, userId });
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
   });
 
   socket.on('disconnect', () => {
