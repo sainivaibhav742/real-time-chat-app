@@ -19,12 +19,12 @@
 - [x] Implement Socket.io events for messages, typing, etc.
 - [x] Add Dockerfile for backend containerization
 
-## Phase 3: Build Frontend
-- [ ] Install Tailwind CSS in client/
-- [ ] Create login/signup pages
-- [ ] Connect Socket.io client
-- [ ] Build chat UI components (ChatWindow, MessageBubble, etc.)
-- [ ] Handle real-time message rendering
+## Phase 3: Build Frontend (Completed)
+- [x] Install Tailwind CSS in client/ (already included in Next.js setup)
+- [x] Create login/signup pages
+- [x] Connect Socket.io client
+- [x] Build chat UI components (ChatWindow, MessageBubble, etc.)
+- [x] Handle real-time message rendering
 
 ## Phase 4: Add Features
 - [ ] Add typing indicator
