@@ -1,23 +1,23 @@
 # Real-Time Chat App Build Plan
 
-## Phase 1: Setup Environment
-- [ ] Check and install Node.js
-- [ ] Check and install MongoDB
-- [ ] Ensure VS Code is set up (already open)
-- [ ] Create client/ and server/ subdirectories
-- [ ] Initialize Next.js app in client/
-- [ ] Initialize Node.js project in server/
-- [ ] Initialize Git repository
-- [ ] Push initial commit to GitHub
+## Phase 1: Setup Environment (Completed)
+- [x] Check and install Node.js
+- [x] Check and install MongoDB (using MongoDB Atlas for cloud deployment)
+- [x] Ensure VS Code is set up (already open)
+- [x] Create client/ and server/ subdirectories
+- [x] Initialize Next.js app in client/
+- [x] Initialize Node.js project in server/
+- [x] Initialize Git repository
+- [x] Push initial commit to GitHub
 
-## Phase 2: Build Backend
-- [ ] Install backend dependencies (express, socket.io, mongoose, cors, dotenv, jsonwebtoken, bcrypt)
-- [ ] Setup Express server with Socket.io
-- [ ] Connect to MongoDB
-- [ ] Create User and Message models
-- [ ] Add auth routes (/register, /login)
-- [ ] Implement Socket.io events for messages, typing, etc.
-- [ ] Add Dockerfile for backend containerization
+## Phase 2: Build Backend (Completed)
+- [x] Install backend dependencies (express, socket.io, mongoose, cors, dotenv, jsonwebtoken, bcrypt)
+- [x] Setup Express server with Socket.io
+- [x] Connect to MongoDB
+- [x] Create User and Message models
+- [x] Add auth routes (/register, /login)
+- [x] Implement Socket.io events for messages, typing, etc.
+- [x] Add Dockerfile for backend containerization
 
 ## Phase 3: Build Frontend
 - [ ] Install Tailwind CSS in client/
