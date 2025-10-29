@@ -59,6 +59,7 @@ io.on('connection', (socket) => {
             roomId: data.roomId
           }, {
             headers: { Authorization: `Bearer ${token}` }
+ 
           });
 
           // Save AI message to database

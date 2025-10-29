@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getSocket } from '../utils/socket';
+import { getSocket, sendEncryptedMessage, handleEncryptedMessage } from '../utils/socket';
 import MessageBubble from './MessageBubble';
 import EmojiPicker from './EmojiPicker';
 
@@ -48,8 +48,10 @@ export default function ChatWindow({ roomId }: ChatWindowProps) {
     fetchMessages();
 
     // Listen for new messages
-    socket.on('receive-message', (message: Message) => {
-      setMessages((prev) => [...prev, message]);
+    socket.on('receive-message', async (message: Message) => {
+      // Handle encrypted messages
+      const processedMessage = await handleEncryptedMessage(message);
+      setMessages((prev) => [...prev, processedMessage]);
     });
 
     // Listen for typing indicators
@@ -85,17 +87,12 @@ export default function ChatWindow({ roomId }: ChatWindowProps) {
     }
   };
 
-  const sendMessage = (e: React.FormEvent) => {
+  const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
 
-    const token = localStorage.getItem('token');
-    socket.emit('send-message', {
-      roomId,
-      senderId: user.id,
-      content: newMessage.trim(),
-      token,
-    });
+    // Send encrypted message
+    await sendEncryptedMessage(roomId, newMessage.trim(), user.username);
 
     setNewMessage('');
     socket.emit('typing', { roomId, user: user.username, isTyping: false });

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { initializeUserCrypto } from "@/utils/crypto";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -9,7 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "ChatFlow - Real-Time Chat App",
-  description: "A modern real-time chat application with AI integration",
+  description: "A modern real-time chat application with AI integration and end-to-end encryption",
 };
 
 export default function RootLayout({
@@ -17,6 +18,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Initialize crypto on app start
+  if (typeof window !== 'undefined') {
+    initializeUserCrypto().catch(console.error);
+  }
+
   return (
     <html lang="en" className="dark">
       <body
