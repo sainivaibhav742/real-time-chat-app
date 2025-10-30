@@ -6,9 +6,9 @@ const User = require('../models/User');
 const router = express.Router();
 
 // Initialize OpenAI
-const openai = new OpenAI({
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 // Middleware to verify JWT
 const authenticateToken = async (req, res, next) => {
@@ -53,6 +53,10 @@ router.post('/chat', authenticateToken, async (req, res) => {
         content: message
       }
     ];
+
+    if (!openai) {
+      return res.status(503).json({ message: 'AI service not available' });
+    }
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',

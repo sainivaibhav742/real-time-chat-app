@@ -20,12 +20,15 @@ export const generateUserKeypair = async () => {
   };
 };
 
+let userPrivateKey: string | null = null;
+
 // Store user keypair securely (in production, use proper key management)
 export const storeUserKeypair = async (keypair: { publicKey: string; privateKey: string }) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('userPublicKey', keypair.publicKey);
-    // In production, encrypt private key before storing
     localStorage.setItem('userPrivateKey', keypair.privateKey);
+    // Store the private key as a simple reference for later retrieval
+    userPrivateKey = keypair.privateKey;
   }
 };
 
@@ -91,10 +94,10 @@ export const decryptRoomKeyForUser = async (encryptedRoomKey: string, userPrivat
   await initSodium();
   try {
     const encryptedKeyBytes = sodium.from_base64(encryptedRoomKey);
-    const privateKey = sodium.from_base64(userPrivateKey);
     const publicKey = sodium.from_base64(userPublicKey);
-    const decryptedKey = sodium.crypto_box_seal_open(encryptedKeyBytes, publicKey, privateKey);
-    return sodium.to_base64(decryptedKey);
+    const privateKey = sodium.from_base64(userPrivateKey);
+    const opened = sodium.crypto_box_seal_open(encryptedKeyBytes, publicKey, privateKey);
+    return sodium.to_base64(opened);
   } catch (error) {
     console.error('Room key decryption failed:', error);
     return null;
@@ -123,8 +126,9 @@ export const getRoomKey = (roomId: string) => {
 export const initializeUserCrypto = async () => {
   let keypair = getUserKeypair();
   if (!keypair) {
-    keypair = await generateUserKeypair();
-    await storeUserKeypair(keypair);
+    const newKeypair = await generateUserKeypair();
+    await storeUserKeypair(newKeypair);
+    keypair = getUserKeypair();
   }
   return keypair;
 };

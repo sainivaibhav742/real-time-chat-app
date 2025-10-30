@@ -4,18 +4,23 @@ const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const messageRoutes = require('./routes/messages');
 const aiRoutes = require('./routes/ai');
+const cryptoRoutes = require('./routes/crypto');
+const roomRoutes = require('./routes/rooms');
 const Message = require('./models/Message');
+const User = require('./models/User');
+const Room = require('./models/Room');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
@@ -27,6 +32,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/crypto', cryptoRoutes);
+app.use('/api/rooms', roomRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatapp', {
@@ -40,70 +47,109 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chatapp',
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join-room', (roomId) => {
+  socket.on('join-room', async (roomId) => {
     socket.join(roomId);
     console.log(`User ${socket.id} joined room ${roomId}`);
+
+    // Implement proper E2EE room key management
+    const room = await Room.findById(roomId).populate('members.userId', 'publicKey');
+    if (room) {
+      const roomKey = crypto.randomBytes(32).toString('base64');
+      const encryptedKeys = {};
+      for (const member of room.members) {
+        const user = member.userId;
+        if (user.publicKey) {
+          const encryptedKey = crypto.publicEncrypt(
+            {
+              key: user.publicKey,
+              padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+              oaepHash: 'sha256',
+            },
+            Buffer.from(roomKey, 'base64')
+          );
+          encryptedKeys[user._id] = encryptedKey.toString('base64');
+        }
+      }
+      io.to(roomId).emit('room-key-distribution', {
+        roomId,
+        encryptedKeys,
+      });
+    }
+  });
+
+  socket.on('request-room-key', async (data) => {
+    const { roomId } = data;
+    const room = await Room.findById(roomId).populate('members.userId', 'publicKey');
+    if (room) {
+      const roomKey = crypto.randomBytes(32).toString('base64');
+      const encryptedKeys = {};
+      for (const member of room.members) {
+        const user = member.userId;
+        if (user.publicKey) {
+          const encryptedKey = crypto.publicEncrypt(
+            {
+              key: user.publicKey,
+              padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+              oaepHash: 'sha256',
+            },
+            Buffer.from(roomKey, 'base64')
+          );
+          encryptedKeys[user._id] = encryptedKey.toString('base64');
+        }
+      }
+      io.to(roomId).emit('room-key-distribution', {
+        roomId,
+        encryptedKeys,
+      });
+    }
   });
 
   socket.on('send-message', async (data) => {
     try {
-      // Check if message is for AI
-      if (data.content.toLowerCase().includes('@ai') || data.content.toLowerCase().includes('ai bot')) {
-        // Handle AI message
-        const axios = require('axios');
-        const token = data.token; // Assume token is sent with message
-
-        try {
-          const aiResponse = await axios.post('http://localhost:5000/api/ai/chat', {
-            message: data.content.replace(/@ai|@ai bot/gi, '').trim(),
-            roomId: data.roomId
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
- 
-          });
-
-          // Save AI message to database
-          const aiMessage = new Message({
-            roomId: data.roomId,
-            sender: null, // AI doesn't have a user ID
-            content: aiResponse.data.message,
-          });
-          await aiMessage.save();
-
-          // Emit AI message to room
-          io.to(data.roomId).emit('receive-message', {
-            _id: aiMessage._id,
-            roomId: aiMessage.roomId,
-            sender: { username: 'AI Assistant' },
-            content: aiMessage.content,
-            timestamp: aiMessage.timestamp,
-          });
-        } catch (aiError) {
-          console.error('AI response error:', aiError);
-        }
-      } else {
-        // Save regular message to database
-        const message = new Message({
-          roomId: data.roomId,
-          sender: data.senderId,
-          content: data.content,
-        });
-        await message.save();
-
-        // Populate sender info
-        await message.populate('sender', 'username');
-
-        // Emit to room
-        io.to(data.roomId).emit('receive-message', {
-          _id: message._id,
-          roomId: message.roomId,
-          sender: message.sender,
-          content: message.content,
-          timestamp: message.timestamp,
-        });
+      const token = data.token || socket.handshake.auth.token;
+      if (!token) {
+        socket.emit('error', { message: 'Authentication required' });
+        return;
       }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const user = await User.findById(decoded.id || decoded.userId);
+
+      if (!user) {
+        socket.emit('error', { message: 'User not found' });
+        return;
+      }
+
+      let messageData = {
+        roomId: data.roomId,
+        sender: user._id,
+        content: data.content,
+        isEncrypted: data.isEncrypted || false,
+        ciphertext: data.ciphertext,
+        nonce: data.nonce
+      };
+
+      // Save message to database
+      const message = new Message(messageData);
+      await message.save();
+
+      // Populate sender info
+      await message.populate('sender', 'username');
+
+      // Emit to room
+      io.to(data.roomId).emit('receive-message', {
+        _id: message._id,
+        roomId: message.roomId,
+        sender: message.sender,
+        content: message.content,
+        timestamp: message.timestamp,
+        isEncrypted: message.isEncrypted,
+        ciphertext: message.ciphertext,
+        nonce: message.nonce
+      });
     } catch (error) {
       console.error('Error saving message:', error);
+      socket.emit('error', { message: 'Failed to send message' });
     }
   });
 

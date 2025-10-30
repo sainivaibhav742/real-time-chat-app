@@ -22,6 +22,16 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  isEncrypted: {
+    type: Boolean,
+    default: false,
+  },
+  ciphertext: {
+    type: String,
+  },
+  nonce: {
+    type: String,
+  },
 });
 
 module.exports = mongoose.model('Message', messageSchema);

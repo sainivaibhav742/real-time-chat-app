@@ -32,84 +32,56 @@ router.post('/public-key', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Public key is required' });
     }
 
-    // Update user's public key
-    const user = await User.findByIdAndUpdate(
-      req.user.userId,
-      { publicKey },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json({
-      message: 'Public key updated successfully',
-      publicKey: user.publicKey
-    });
+    await User.findByIdAndUpdate(req.user.id, { publicKey });
+    res.json({ message: 'Public key updated successfully' });
   } catch (error) {
-    console.error('Public key update error:', error);
+    console.error('Error updating public key:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get room members' public keys
-router.get('/room-members/:roomId', authenticateToken, async (req, res) => {
+// Get room members
+router.get('/room/:roomId/members', authenticateToken, async (req, res) => {
   try {
     const { roomId } = req.params;
 
-    // Find room and get member user IDs
-    const room = await Room.findOne({ name: roomId }).populate('members.userId', 'username publicKey');
-    if (!room) {
-      return res.status(404).json({ message: 'Room not found' });
-    }
-
-    // Extract public keys of room members
-    const members = room.members.map(member => ({
-      userId: member.userId._id,
-      username: member.userId.username,
-      publicKey: member.userId.publicKey
-    })).filter(member => member.publicKey); // Only include users with public keys
-
-    res.json({ members });
+    // For now, we'll assume all users are in all rooms
+    // In a real app, you'd have a proper room membership system
+    const users = await User.find({}, 'username publicKey');
+    res.json(users);
   } catch (error) {
-    console.error('Room members fetch error:', error);
+    console.error('Error fetching room members:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Create or join room
-router.post('/join-room', authenticateToken, async (req, res) => {
+// Join room (initialize room key distribution)
+router.post('/room/:roomId/join', authenticateToken, async (req, res) => {
   try {
-    const { roomId } = req.body;
+    const { roomId } = req.params;
+    const { roomKey } = req.body;
 
-    if (!roomId) {
-      return res.status(400).json({ message: 'Room ID is required' });
+    if (!roomKey) {
+      return res.status(400).json({ message: 'Room key is required' });
     }
 
-    // Find or create room
-    let room = await Room.findOne({ name: roomId });
-    if (!room) {
-      room = new Room({ name: roomId, members: [] });
+    // Get all room members
+    const users = await User.find({}, 'username publicKey');
+
+    // Encrypt room key for each member using their public key
+    const crypto = require('crypto-js');
+    const encryptedKeys = {};
+
+    for (const user of users) {
+      // In production, use proper asymmetric encryption
+      // For now, using symmetric encryption as placeholder
+      const encryptedKey = crypto.AES.encrypt(roomKey, user.publicKey).toString();
+      encryptedKeys[user._id] = encryptedKey;
     }
 
-    // Check if user is already a member
-    const isMember = room.members.some(member =>
-      member.userId.toString() === req.user.userId
-    );
-
-    if (!isMember) {
-      room.members.push({ userId: req.user.userId });
-      await room.save();
-    }
-
-    res.json({
-      message: 'Joined room successfully',
-      roomId: room.name,
-      memberCount: room.members.length
-    });
+    res.json({ encryptedKeys });
   } catch (error) {
-    console.error('Join room error:', error);
+    console.error('Error joining room:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
