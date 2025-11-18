@@ -59,15 +59,19 @@ io.on('connection', (socket) => {
       for (const member of room.members) {
         const user = member.userId;
         if (user.publicKey) {
-          const encryptedKey = crypto.publicEncrypt(
-            {
-              key: user.publicKey,
-              padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-              oaepHash: 'sha256',
-            },
-            Buffer.from(roomKey, 'base64')
-          );
-          encryptedKeys[user._id] = encryptedKey.toString('base64');
+          try {
+            const encryptedKey = crypto.publicEncrypt(
+              {
+                key: user.publicKey,
+                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+                oaepHash: 'sha256',
+              },
+              Buffer.from(roomKey, 'base64')
+            );
+            encryptedKeys[user._id] = encryptedKey.toString('base64');
+          } catch (error) {
+            console.error(`Failed to encrypt room key for user ${user._id}:`, error);
+          }
         }
       }
       io.to(roomId).emit('room-key-distribution', {
@@ -86,15 +90,19 @@ io.on('connection', (socket) => {
       for (const member of room.members) {
         const user = member.userId;
         if (user.publicKey) {
-          const encryptedKey = crypto.publicEncrypt(
-            {
-              key: user.publicKey,
-              padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-              oaepHash: 'sha256',
-            },
-            Buffer.from(roomKey, 'base64')
-          );
-          encryptedKeys[user._id] = encryptedKey.toString('base64');
+          try {
+            const encryptedKey = crypto.publicEncrypt(
+              {
+                key: user.publicKey,
+                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+                oaepHash: 'sha256',
+              },
+              Buffer.from(roomKey, 'base64')
+            );
+            encryptedKeys[user._id] = encryptedKey.toString('base64');
+          } catch (error) {
+            console.error(`Failed to encrypt room key for user ${user._id}:`, error);
+          }
         }
       }
       io.to(roomId).emit('room-key-distribution', {
